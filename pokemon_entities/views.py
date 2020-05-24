@@ -1,7 +1,8 @@
 import folium
-from django.http import HttpResponseNotFound
 from django.shortcuts import render
 from .models import Pokemon, PokemonEntity
+from django.core.exceptions import ObjectDoesNotExist
+from django.http import Http404
 
 
 MOSCOW_CENTER = [55.751244, 37.618423]
@@ -46,7 +47,10 @@ def show_all_pokemons(request):
 
 
 def show_pokemon(request, pokemon_id):
-    pokemon = Pokemon.objects.get(id=pokemon_id)
+    try:
+        pokemon = Pokemon.objects.get(id=pokemon_id)
+    except ObjectDoesNotExist:
+        raise Http404("No matches the given query.")
     pokemon_description = {
         'pokemon_id': pokemon.id,
         'img_url': pokemon.image.url,
@@ -55,22 +59,20 @@ def show_pokemon(request, pokemon_id):
         'title_jp': pokemon.title_jp,
         'description': pokemon.description,
          }
-    if pokemon.next_evolutions is not None:
-        for next_evolution in pokemon.next_evolutions.all():
-            pokemon_description['next_evolution'] = {
-                "title_ru": next_evolution.title,
-                "pokemon_id": next_evolution.id,
-                "img_url": next_evolution.image.url
-            }
-    if pokemon.previous_evolution is not None:
+
+    next_evolution = pokemon.next_evolutions.first()
+    if next_evolution:
+        pokemon_description['next_evolution'] = {
+            "title_ru": next_evolution.title,
+            "pokemon_id": next_evolution.id,
+            "img_url": next_evolution.image.url
+        }
+    if pokemon.previous_evolution:
         pokemon_description['previous_evolution'] = {
                 'title_ru': pokemon.previous_evolution.title,
                 'pokemon_id': pokemon.previous_evolution.id,
                 'img_url': pokemon.previous_evolution.image.url
             }
-
-    if pokemon.id != int(pokemon_id):
-        return HttpResponseNotFound('<h1>Такой покемон не найден</h1>')
 
     folium_map = folium.Map(location=MOSCOW_CENTER, zoom_start=12)
 
